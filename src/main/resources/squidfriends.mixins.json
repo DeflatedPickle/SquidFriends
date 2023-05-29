@@ -1,5 +1,8 @@
 {
-    "mixins": ["MixinSquidEntity"],
+    "mixins": [
+        "MixinSquidEntity",
+        "MixinSquidEntityModel"
+    ],
     "minVersion": "0.8",
     "package": "${group}.${id}.mixin",
     "injectors": {"defaultRequire": 1},

@@ -3,6 +3,7 @@
 package com.deflatedpickle.squidfriends.mixin;
 
 import com.deflatedpickle.squidfriends.api.IBreedable;
+import com.deflatedpickle.squidfriends.api.IDoesAge;
 import com.deflatedpickle.squidfriends.mojank.FollowParentSquidGoal;
 import com.deflatedpickle.squidfriends.mojank.SquidMateGoal;
 import java.util.UUID;
@@ -41,7 +42,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @SuppressWarnings({"UnusedMixin", "WrongEntityDataParameterClass"})
 @Mixin(SquidEntity.class)
-public abstract class MixinSquidEntity extends WaterCreatureEntity implements IBreedable {
+public abstract class MixinSquidEntity extends WaterCreatureEntity implements IBreedable, IDoesAge {
   private static final TrackedData<Boolean> CHILD;
   protected int breedingAge;
   protected int forcedAge;
@@ -96,8 +97,10 @@ public abstract class MixinSquidEntity extends WaterCreatureEntity implements IB
     this.goalSelector.add(1, new FollowParentSquidGoal((SquidEntity) (Object) this, 1.1));
   }
 
-  protected void onGrowUp() {}
+  @Override
+  public void onGrowUp() {}
 
+  @Override
   public boolean isBaby() {
     return this.getBreedingAge() < 0;
   }
@@ -107,6 +110,7 @@ public abstract class MixinSquidEntity extends WaterCreatureEntity implements IB
     return this.getBreedingAge() >= 0;
   }
 
+  @Override
   public void setBaby(boolean baby) {
     this.setBreedingAge(baby ? -24000 : 0);
   }
@@ -132,6 +136,15 @@ public abstract class MixinSquidEntity extends WaterCreatureEntity implements IB
     }
   }
 
+  public void setBreedingAge(int age) {
+    int i = this.getBreedingAge();
+    this.breedingAge = age;
+    if (i < 0 && age >= 0 || i >= 0 && age < 0) {
+      this.dataTracker.set(CHILD, age < 0);
+      this.onGrowUp();
+    }
+  }
+
   public void growUp(int age, boolean overGrow) {
     int i = this.getBreedingAge();
     int j = i;
@@ -151,15 +164,6 @@ public abstract class MixinSquidEntity extends WaterCreatureEntity implements IB
 
     if (this.getBreedingAge() == 0) {
       this.setBreedingAge(this.forcedAge);
-    }
-  }
-
-  public void setBreedingAge(int age) {
-    int i = this.getBreedingAge();
-    this.breedingAge = age;
-    if (i < 0 && age >= 0 || i >= 0 && age < 0) {
-      this.dataTracker.set(CHILD, age < 0);
-      this.onGrowUp();
     }
   }
 
@@ -201,24 +205,27 @@ public abstract class MixinSquidEntity extends WaterCreatureEntity implements IB
 
   @Inject(method = "tickMovement", at = @At("TAIL"))
   public void onTickMovement(CallbackInfo ci) {
-    if (this.getBreedingAge() != 0) {
-      this.loveTicks = 0;
-    }
+    if (this.world.isClient) {
+      if (this.happyTicksRemaining > 0) {
+        if (this.happyTicksRemaining % 4 == 0) {
+          this.world.addParticle(
+              ParticleTypes.HAPPY_VILLAGER,
+              this.getParticleX(1.0),
+              this.getRandomBodyY() + 0.5,
+              this.getParticleZ(1.0),
+              0.0,
+              0.0,
+              0.0);
+        }
 
-    if (this.loveTicks > 0) {
-      --this.loveTicks;
-      if (this.loveTicks % 10 == 0) {
-        double d = this.random.nextGaussian() * 0.02;
-        double e = this.random.nextGaussian() * 0.02;
-        double f = this.random.nextGaussian() * 0.02;
-        this.world.addParticle(
-            ParticleTypes.HEART,
-            this.getParticleX(1.0),
-            this.getRandomBodyY() + 0.5,
-            this.getParticleZ(1.0),
-            d,
-            e,
-            f);
+        --this.happyTicksRemaining;
+      }
+    } else if (this.isAlive()) {
+      int i = this.getBreedingAge();
+      if (i < 0) {
+        this.setBreedingAge(++i);
+      } else if (i > 0) {
+        this.setBreedingAge(--i);
       }
     }
   }
